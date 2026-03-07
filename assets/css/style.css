@@ -26,7 +26,7 @@ html, body {
     width: 100vw;
     height: 100vh;
     display: flex;
-    background-image: url("https://github.com/Ventus316/web-project-assets/blob/main/bj-gq.jpg?raw=true");
+    background-image: url("../images/bj-gq.jpg");
     background-size: cover;
     background-position: center;
     position: relative;
@@ -36,7 +36,7 @@ html, body {
     width: 50vw;
     height: 60vh;
     padding: 5px;
-    background-image: url("://github.com/Ventus316/web-project-assets/blob/main/henghttps.png?raw=true");
+    background-image: url("../images/heng.png");
     background-size: cover;
     background-position: center 30%;
     background-repeat: no-repeat;
