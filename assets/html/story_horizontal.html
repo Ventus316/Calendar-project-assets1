@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>難哄・原版風格回歸</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Times New Roman', 'Noto Serif TC', serif; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        /* 背景設定：完全移除遮罩，呈現原圖 */
+        .background {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-image: url("./gq_bj.jpg"); 
+            background-size: cover;
+            background-position: center; 
+            background-repeat: no-repeat;
+            z-index: -1;
+        }
+
+        /* 標題區域：下調至 60vh */
+        .header-info {
+            position: fixed;
+            bottom: 60vh; 
+            left: 28vw;   
+            transform: translateX(-50%);
+            
+            text-align: center;
+            z-index: 20; 
+            color: #d4af37;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            pointer-events: none;
+            transition: opacity 0.3s;
+            width: 50vw;
+        }
+        
+        .header-info h1 { 
+            font-size: clamp(24px, 3.5vw, 42px); 
+            letter-spacing: 0.2em; 
+            margin: 0;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* 時間軸容器 */
+        .timeline-wrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: flex-end; 
+            padding-bottom: 10vh; 
+            
+            overflow-x: auto;
+            overflow-y: hidden;
+            
+            padding-left: 28vw;  
+            padding-right: 72vw; 
+            
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+            z-index: 10;
+        }
+        .timeline-wrapper::-webkit-scrollbar { display: none; }
+
+        .card-item {
+            position: relative;
+            flex: 0 0 auto;
+            width: 22vw;  
+            min-width: 220px;
+            height: 42vh; 
+            margin: 0 1vw; 
+            
+            background: rgba(43, 34, 34, 0.95); /* 稍微加深一點底色以確保文字在無遮罩背景上清晰 */
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform-origin: bottom center; 
+            
+            transition: border-color 0.3s, box-shadow 0.3s, opacity 0.3s; 
+            will-change: transform, margin-left, margin-right;
+        }
+
+        .card-item.locked {
+            background: rgba(20, 20, 20, 0.85);
+            border-color: #444;
+            color: #555;
+            cursor: not-allowed;
+        }
+
+        .card-date {
+            font-size: 6vh; 
+            font-weight: bold;
+            color: #d4af37;
+            margin-bottom: 1vh;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        }
+        
+        .card-title {
+            font-size: 2vh;
+            color: #fff;
+            padding: 0 10px;
+            opacity: 0; 
+            transform: translateY(10px);
+            transition: all 0.5s ease;
+            margin-top: 2vh;
+        }
+
+        .card-item.active-card .card-title {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .card-item.active-card {
+            border: 1px solid #d4af37;
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.3);
+            background: rgba(50, 40, 40, 1);
+        }
+
+        .card-lock-icon { font-size: 5vh; opacity: 0.4; margin-bottom: 2vh; }
+
+        /* 全螢幕轉場 */
+        #video-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: black; z-index: 100;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.5s ease-in-out;
+        }
+        #video-overlay.active { opacity: 1; pointer-events: all; }
+        #transition-video {
+            position: absolute; top: 50%; left: 50%;
+            min-width: 100%; min-height: 100%; width: auto; height: auto;
+            transform: translate(-50%, -50%); object-fit: cover; display: none;
+        }
+        
+        /* --- 詳細頁面 (還原原版樣式) --- */
+        #detail-view {
+            position: fixed;
+            top: 50%; 
+            /* 固定在左側，不隨卡片移動，避免遮擋右側人像 */
+            left: 5vw; 
+            
+            /* 尺寸設定 */
+            width: 50vw;
+            max-width: 700px; 
+            height: 60vh;
+            
+            /* 垂直置中 */
+            transform: translate(0, -50%);
+            
+            /* 樣式還原 */
+            background: rgba(30, 24, 24, 0.95); 
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 5px; 
+            box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+            
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+            z-index: 150;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        #detail-view.active { opacity: 1; visibility: visible; }
+
+        /* 內部縮放容器 (原版邏輯) */
+        .detail-scaler {
+            width: 900px; /* 基準寬度 */
+            height: 500px; /* 基準高度 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px; 
+            transform-origin: center center;
+        }
+
+        .detail-date {
+            font-size: 4em; 
+            color: #d4af37; 
+            font-weight: bold;
+            margin-bottom: 30px; 
+            text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+            text-align: center; 
+            letter-spacing: 2px;
+            width: 100%;
+            line-height: 1;
+        }
+        .detail-title { 
+            font-size: 2em; 
+            margin-bottom: 40px; 
+            color: #ffffff; 
+            font-weight: normal;
+            text-shadow: 0 2px 5px rgba(0,0,0,1); 
+            text-align: left;
+            padding-left: 40px; 
+            position: relative;
+            letter-spacing: 1px;
+            width: 100%;
+        }
+        .detail-text {
+            font-size: 2.5em; 
+            line-height: 1.4;
+            letter-spacing: 2px;
+            font-style: italic;
+            color: #ffd700; 
+            font-weight: bold; 
+            text-shadow: 0 2px 5px rgba(0,0,0,1); 
+            text-align: right;
+            padding-right: 40px; 
+            margin-bottom: 30px; 
+            width: 100%;
+        }
+
+        .reset-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.5); color: #555;
+            border: 1px solid #333; padding: 5px 10px;
+            border-radius: 4px; cursor: pointer; z-index: 200;
+        }
+        .reset-btn:hover { color: #d4af37; border-color: #d4af37; }
+
+    </style>
+</head>
+<body>
+
+    <div class="background"></div>
+
+    <div class="header-info">
+        <h1>DECEMBER</h1>
+    </div>
+
+    <div class="timeline-wrapper" id="timeline-scroll-area">
+        </div>
+
+    <div id="video-overlay">
+        <video id="transition-video" muted playsinline>
+            您的瀏覽器不支援 HTML5 影片。
+        </video>
+    </div>
+
+    <div id="detail-view" onclick="closeDetail()">
+        <div class="detail-scaler" id="detail-scaler">
+            <div class="detail-date" id="display-date">12 / 01</div>
+            <div class="detail-title" id="display-title">標題</div>
+            <div class="detail-text" id="display-quote">內容</div>
+        </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetProgress()">↻</button>
+
+    <script>
+        const episodes = [
+            { ep: "EP 01", title: "再見，桑延", quote: "再見，溫以凡" },
+            { ep: "EP 02", title: "你的名字", quote: "刻在我心底" },
+            { ep: "EP 03", title: "每個人都需要白月光", quote: "你就是我的白月光" },
+            { ep: "EP 04", title: "流言", quote: "由我幫你吹散" },
+            { ep: "EP 05", title: "靠近一點", quote: "可以嗎？" },
+            { ep: "EP 06", title: "我會一直陪著你", quote: "你會一直陪著我？" },
+            { ep: "EP 07", title: "偷偷……", quote: "藏不住" },
+            { ep: "EP 08", title: "雨中的太陽", quote: "耀眼而溫暖" },
+            { ep: "EP 09", title: "口是心非", quote: "但是身體會很誠實" },
+            { ep: "EP 10", title: "你忘了", quote: "但我記得" },
+            { ep: "EP 11", title: "保護好自己", quote: "我都在" },
+            { ep: "EP 12", title: "如何才能快樂？", quote: "有你才快樂" },
+            { ep: "EP 13", title: "約好了", quote: "想跟你一起" },
+            { ep: "EP 14", title: "放不下", quote: "對你的感覺" },
+            { ep: "EP 15", title: "痕跡", quote: "是愛刻出來的" },
+            { ep: "EP 16", title: "生日快樂", quote: "得償所願" },
+            { ep: "EP 17", title: "最遙遠的距離", quote: "是說不出口的愛你" },
+            { ep: "EP 18", title: "在飛奔向你的途中", quote: "請在原地等我" },
+            { ep: "EP 19", title: "敗降", quote: "不是敗將，而是敗給你溫霜降" },
+            { ep: "EP 20", title: "想悄悄住進你的靈魂", quote: "接住你在每一個脆弱的時刻" },
+            { ep: "EP 21", title: "希望在哪？", quote: "希望在未來每一個有你的地方" },
+            { ep: "EP 22", title: "機會是留給你的", quote: "而我，已經準備好被你抓住了" },
+            { ep: "EP 23", title: "躲能躲哪兒？", quote: "只能躲進我懷裡" },
+            { ep: "EP 24", title: "離開的理由", quote: "是不願成為你人生的風暴" },
+            { ep: "EP 25", title: "不管你在哪", quote: "我去找你" },
+            { ep: "EP 26", title: "約定", quote: "我不會再失約了" },
+            { ep: "EP 27", title: "我接受", quote: "不完美的自己" },
+            { ep: "EP 28", title: "重生的機會", quote: "如果有，一定還是為了遇見你" },
+            { ep: "EP 29", title: "愛是", quote: "成為彼此的光" },
+            { ep: "EP 30", title: "依靠是", quote: "托付脆弱，堅定選擇" },
+            { ep: "EP 31", title: "愛你", quote: "從相遇的第一天到未來每一天" },
+            { ep: "EP 32", title: "至死都暴烈地愛我", quote: "是你！" }
+        ];
+
+        let unlockedIndex = parseInt(localStorage.getItem('loveCalendarProgress')) || 0;
+        const wrapper = document.getElementById('timeline-scroll-area');
+        const videoOverlay = document.getElementById('video-overlay');
+        const transitionVideo = document.getElementById('transition-video');
+        const detailView = document.getElementById('detail-view');
+        const detailScaler = document.getElementById('detail-scaler'); 
+        const videoSourceURL = './trans.mp4';
+        
+        let currentViewingIndex = -1;
+        let cardElements = [];
+        let centerIndex = -1;
+        
+        let snapTargetIndex = -1; 
+        let isSnapping = false;
+
+        // 詳細頁縮放邏輯 (原版移植)
+        function scaleDetailView() {
+            const containerWidth = detailView.offsetWidth;
+            const containerHeight = detailView.offsetHeight;
+            const contentWidth = 900; 
+            const contentHeight = 500; 
+            const scaleX = containerWidth / contentWidth;
+            const scaleY = containerHeight / contentHeight;
+            let scale = Math.min(scaleX, scaleY);
+            scale = Math.min(scale, 1);
+            detailScaler.style.transform = `scale(${scale})`;
+        }
+        window.addEventListener('resize', scaleDetailView);
+
+        function initTimeline() {
+            const existingItems = document.querySelectorAll('.card-item');
+            existingItems.forEach(el => el.remove());
+            cardElements = [];
+
+            episodes.forEach((data, index) => {
+                const card = document.createElement('div');
+                card.className = 'card-item';
+                
+                let displayDate = (index + 1).toString().padStart(2, '0');
+                if (index === 31) displayDate = "01";
+
+                if (index > unlockedIndex) {
+                    card.classList.add('locked');
+                    card.innerHTML = `
+                        <div class="card-lock-icon" style="margin-top: 5vh;">🔒</div>
+                        <div class="card-date" style="opacity: 0.3;">${displayDate}</div>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div class="card-date">${displayDate}</div>
+                        <div class="card-title">${data.title}</div>
+                    `;
+                    card.onclick = () => handleCardClick(index);
+                }
+
+                card.id = `card-${index}`;
+                wrapper.appendChild(card);
+                cardElements.push(card);
+            });
+
+            // 關鍵修復：在設定 Scroll 之前，先執行一次邏輯計算出所有卡片的寬度/Margin
+            // 這樣 DOM 佈局確定了，ScrollTo 才會準
+            updateCardScalesLogic();
+
+            // 初始定位
+            scrollToCard(unlockedIndex, 'auto');
+
+            // 啟動迴圈
+            requestAnimationFrame(animationLoop);
+        }
+
+        // 抽離出邏輯，方便初始化時單獨調用
+        function updateCardScalesLogic() {
+            const wrapperWidth = wrapper.getBoundingClientRect().width;
+            const focusPoint = wrapperWidth * 0.28; 
+
+            let closestDist = Infinity;
+            let tempCenterIndex = -1;
+
+            cardElements.forEach((card, index) => {
+                const rect = card.getBoundingClientRect();
+                const cardWidth = rect.width; // 當下寬度
+                const cardCenter = rect.left + cardWidth / 2;
+                
+                const distance = Math.abs(focusPoint - cardCenter);
+                
+                if (distance < closestDist) {
+                    closestDist = distance;
+                    tempCenterIndex = index;
+                }
+                
+                const activeRange = cardWidth * 0.7; 
+                const neighborRange = cardWidth * 1.8; 
+                
+                let scale = 1;
+                let opacity = 1;
+                let zIndex = 0;
+
+                if (distance < activeRange) {
+                    scale = 1.15 - (distance / activeRange) * 0.15; 
+                    card.classList.add('active-card');
+                    zIndex = 10;
+                    opacity = 1;
+                } else if (distance < neighborRange) {
+                    const progress = (distance - activeRange) / (neighborRange - activeRange);
+                    scale = 1.0 - (progress * 0.3); 
+                    card.classList.remove('active-card');
+                    zIndex = 5;
+                    opacity = 0.8;
+                } else {
+                    scale = 0.7; 
+                    card.classList.remove('active-card');
+                    zIndex = 1;
+                    opacity = 0.3; 
+                }
+
+                const visualLossPerSide = (cardWidth * (1 - scale)) / 2;
+                const baseGap = wrapperWidth * 0.005; 
+                const newMargin = baseGap - visualLossPerSide;
+
+                card.style.transform = `scale(${scale})`;
+                card.style.opacity = opacity;
+                card.style.zIndex = zIndex;
+                card.style.marginLeft = `${newMargin}px`;
+                card.style.marginRight = `${newMargin}px`;
+            });
+            centerIndex = tempCenterIndex;
+        }
+
+        function animationLoop() {
+            const wrapperWidth = wrapper.getBoundingClientRect().width;
+            const focusPoint = wrapperWidth * 0.28;
+            
+            // 1. 自動導航
+            if (isSnapping && snapTargetIndex !== -1) {
+                const targetCard = cardElements[snapTargetIndex];
+                if (targetCard) {
+                    const rect = targetCard.getBoundingClientRect();
+                    const currentCenter = rect.left + rect.width / 2;
+                    const diff = currentCenter - focusPoint;
+                    
+                    if (Math.abs(diff) > 0.5) {
+                        wrapper.scrollLeft += diff * 0.15; 
+                    }
+                }
+            }
+
+            // 2. 更新縮放
+            updateCardScalesLogic();
+            
+            requestAnimationFrame(animationLoop);
+        }
+
+        function scrollToCard(index, behavior = 'smooth') {
+            const card = document.getElementById(`card-${index}`);
+            if (!card) return;
+            
+            // 強制計算一次位置，確保準確
+            updateCardScalesLogic();
+
+            const wrapperWidth = wrapper.clientWidth;
+            const targetFocusPoint = wrapperWidth * 0.28;
+            
+            // 因為是 display:flex，offsetLeft 是相對容器起始點的
+            // 我們需要加上當前的 margin 修正
+            const cardLeft = card.offsetLeft; 
+            const cardWidth = card.offsetWidth; // 這是 DOM 寬度 (不含 scale 縮小視覺)
+            const cardCenter = cardLeft + cardWidth / 2;
+
+            const targetScrollLeft = cardCenter - targetFocusPoint;
+            
+            wrapper.scrollTo({
+                left: targetScrollLeft,
+                behavior: behavior
+            });
+        }
+
+        function handleCardClick(index) {
+            if (index === centerIndex) {
+                openCard(index);
+            } else {
+                snapTargetIndex = index;
+                isSnapping = true;
+            }
+        }
+
+        wrapper.addEventListener("wheel", (evt) => {
+            evt.preventDefault();
+            wrapper.scrollLeft += evt.deltaY;
+            isSnapping = false; 
+            snapTargetIndex = -1;
+        });
+        
+        wrapper.addEventListener("touchstart", () => {
+            isSnapping = false;
+            snapTargetIndex = -1;
+        });
+
+        function openCard(index) {
+            currentViewingIndex = index;
+            const data = episodes[index];
+            let displayDateStr = (index + 1).toString().padStart(2, '0');
+            if (index === 31) displayDateStr = "01 / 01";
+            else displayDateStr = `12 / ${displayDateStr}`;
+
+            document.getElementById('display-date').innerText = displayDateStr;
+            document.getElementById('display-title').innerText = data.title;
+            document.getElementById('display-quote').innerHTML = data.quote;
+
+            wrapper.style.opacity = '0'; 
+            document.querySelector('.header-info').style.opacity = '0'; 
+            playTransition();
+        }
+
+        function playTransition() {
+            videoOverlay.classList.add('active');
+            if (!transitionVideo.src || transitionVideo.src === window.location.href) {
+                 transitionVideo.src = videoSourceURL;
+            }
+            transitionVideo.playbackRate = 3.2;
+            transitionVideo.style.display = 'block';
+            transitionVideo.currentTime = 0;
+            transitionVideo.play().catch(e => console.log(e));
+
+            setTimeout(() => {
+                finishTransition();
+            }, 2500); 
+        }
+
+        function finishTransition() {
+            scaleDetailView();
+            detailView.classList.add('active');
+            videoOverlay.classList.remove('active');
+            setTimeout(() => {
+                transitionVideo.pause();
+                transitionVideo.style.display = 'none';
+            }, 500);
+        }
+
+        function closeDetail() {
+            detailView.classList.remove('active');
+            wrapper.style.opacity = '1'; 
+            document.querySelector('.header-info').style.opacity = '1';
+
+            if (currentViewingIndex === unlockedIndex && unlockedIndex < episodes.length - 1) {
+                unlockedIndex++;
+                localStorage.setItem('loveCalendarProgress', unlockedIndex);
+                setTimeout(() => {
+                    initTimeline(); 
+                    // 確保重新對齊
+                    scrollToCard(unlockedIndex, 'smooth');
+                }, 600);
+            }
+        }
+
+        function resetProgress() {
+            if(confirm("重置回到起點？")) {
+                localStorage.removeItem('loveCalendarProgress');
+                unlockedIndex = 0;
+                initTimeline();
+            }
+        }
+
+        initTimeline();
+        scaleDetailView();
+    </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>難哄・日曆</title>
+
+    <link rel="preload" href="./assets/images/bj-gq.jpg" as="image">
+    <link rel="preload" href="./assets/images/heng.png" as="image">
+
+    <link rel="stylesheet" href="./assets/css/style.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+    </style>
+
+</head>
+<body>
+    <div class="background">
+        <div class="container" id="calendar-container">
+            <div class="info-column">
+                <div class="month-text">
+                    <p class="month_red">DEC</p><p>EMBER</p>
+                </div>
+                <div class="details-block">
+                    <div class="year-text">2025</div>
+                    <div class="producer-info">李柏融</div>
+                </div>
+            </div>
+            <div class="title title_1">SUN</div> <div class="title">MON</div> <div class="title">TUE</div>
+            <div class="title">WED</div> <div class="title">THU</div> <div class="title">FRI</div> <div class="title title_1">SAT</div>
+            <div class="days ndays">30</div>
+            <div class="days date-cell" data-idx="0">01</div> <div class="days date-cell" data-idx="1">02</div> <div class="days date-cell" data-idx="2">03</div>
+            <div class="days date-cell" data-idx="3">04</div> <div class="days date-cell" data-idx="4">05</div> <div class="days date-cell" data-idx="5">06</div>
+            <div class="days date-cell" data-idx="6">07</div> <div class="days date-cell" data-idx="7">08</div> <div class="days date-cell" data-idx="8">09</div>
+            <div class="days date-cell" data-idx="9">10</div> <div class="days date-cell" data-idx="10">11</div> <div class="days date-cell" data-idx="11">12</div>
+            <div class="days date-cell" data-idx="12">13</div> <div class="days date-cell" data-idx="13">14</div> <div class="days date-cell" data-idx="14">15</div>
+            <div class="days date-cell" data-idx="15">16</div> <div class="days date-cell" data-idx="16">17</div> <div class="days date-cell" data-idx="17">18</div>
+            <div class="days date-cell" data-idx="18">19</div> <div class="days date-cell" data-idx="19">20</div> <div class="days date-cell" data-idx="20">21</div>
+            <div class="days date-cell" data-idx="21">22</div> <div class="days date-cell" data-idx="22">23</div> <div class="days date-cell" data-idx="23">24</div>
+            <div class="days date-cell" data-idx="24">25</div> <div class="days date-cell" data-idx="25">26</div> <div class="days date-cell" data-idx="26">27</div>
+            <div class="days date-cell" data-idx="27">28</div> <div class="days date-cell" data-idx="28">29</div> <div class="days date-cell" data-idx="29">30</div>
+            <div class="days date-cell" data-idx="30">31</div>
+            <div class="days date-cell" data-idx="31" style="color: #ffcc80;">01</div> 
+            <div class="days ndays">02</div> <div class="days ndays">03</div>
+            <div class="days ndays">04</div> <div class="days ndays">05</div>
+        </div>
+
+        <div id="video-overlay">
+            <video id="transition-video" playsinline preload="auto">
+                您的瀏覽器不支援 HTML5 影片。
+            </video>
+            <button id="skip-btn" onclick="skipVideo()">SKIP ⏭</button>
+        </div>
+
+        <div id="detail-overlay"></div>
+
+        <div id="detail-view">
+            <div class="detail-scaler" id="detail-scaler">
+                
+                <div class="detail-date" id="display-date">12 / 28</div>
+
+                <div class="content-body">
+                    <div class="detail-title hidden-initially" id="display-title">標題</div>
+                    <div class="detail-text hidden-initially" id="display-quote">內文</div>
+                </div>
+
+                <div class="interaction-area hidden-initially" id="interaction-area">
+                    
+                    <div class="layer-images" id="egg-group">
+                        <div id="easter-egg-btn" class="egg-item">
+                            <img id="easter-egg-img" src="" alt="彩蛋1">
+                        </div>
+                        <div id="easter-egg-btn-2" class="egg-item">
+                            <img id="easter-egg-img-2" src="./assets/images/1-1.jpg" alt="彩蛋2">
+                        </div>
+                    </div>
+
+                    <div class="layer-hint" id="hint-layer">
+                        <div class="hint-left">See you tomorrow</div>
+                        <div class="hint-right" id="display-hint"></div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <button class="reset-btn" onclick="resetProgress()">↻ 重置進度</button>
+
+    <div id="debug-panel">
+        <h3>🔧 開發者測試面板</h3>
+        <p>設定 Day 1 起始日期：</p>
+        <div class="debug-controls">
+            <input type="date" id="debug-date-input">
+            <button onclick="setDebugDate()">確認修改</button>
+        </div>
+        <p class="debug-hint">日曆將以該日期作為第1天重新排列。</p>
+    </div>
+
+    <script src="./assets/js/data.js"></script>
+    <script src="./assets/js/main.js"></script>
+</body>
+</html>

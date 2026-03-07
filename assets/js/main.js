@@ -1,0 +1,530 @@
+// ==========================================
+//  初始化與變數設定
+// ==========================================
+
+// 讀取進度與設定
+let unlockedIndex = parseInt(localStorage.getItem('loveCalendarProgress')) || 0;
+let currentViewingIndex = -1; 
+let lastViewedIndex = -1;
+
+// ==========================================
+//  日期設定 (已修正：加入鎖定邏輯)
+// ==========================================
+let savedStartDate = localStorage.getItem('loveCalendarStartDate');
+let startDate;
+
+if (savedStartDate) {
+    // 1. 如果記憶體有存檔 (代表不是第一次來)，讀取舊的日期
+    startDate = new Date(savedStartDate);
+} else {
+    // 2. 如果記憶體沒東西 (代表是第一次打開！)，以「今天」作為開始
+    startDate = new Date();
+    // 【關鍵修改】立刻把它存入 localStorage！鎖定這一天！
+    localStorage.setItem('loveCalendarStartDate', startDate.toISOString());
+}
+
+// 【新增】計算目前過了幾天
+function getDaysPassed() {
+    const now = new Date();
+    const start = new Date(startDate);
+    
+    // 歸零時間部分，只比較日期
+    now.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0);
+    
+    const diffTime = now - start;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 確保不會是負數 (例如使用者把電腦時間調到過去)
+    return Math.max(0, diffDays); 
+}
+
+// 開發者模式
+let isDevMode = false;
+let devClickCount = 0;
+let devClickTimer = null;
+
+// DOM 元素選取
+const calendar = document.getElementById('calendar-container');
+const videoOverlay = document.getElementById('video-overlay');
+const detailView = document.getElementById('detail-view');
+const detailScaler = document.getElementById('detail-scaler'); 
+const transitionVideo = document.getElementById('transition-video');
+const skipBtn = document.getElementById('skip-btn');
+const detailOverlay = document.getElementById('detail-overlay');
+const producerInfo = document.querySelector('.producer-info'); 
+const debugPanel = document.getElementById('debug-panel');
+const debugInput = document.getElementById('debug-date-input');
+
+// 卡片內容元素
+const detailTitle = document.getElementById('display-title');
+const detailQuote = document.getElementById('display-quote');
+const detailHint = document.getElementById('display-hint');
+
+// 互動區選取
+const interactionArea = document.getElementById('interaction-area');
+const easterEggBtn1 = document.getElementById('easter-egg-btn');
+const easterEggBtn2 = document.getElementById('easter-egg-btn-2');
+const easterEggImg1 = document.getElementById('easter-egg-img');
+const easterEggImg2 = document.getElementById('easter-egg-img-2');
+
+// 狀態管理
+// 0: 初始狀態
+// 1: 階段一 (播完 Video 1，顯示 Title)
+// 2: 階段二 (播完 Video 2，完整顯示全內容 - 圖片狀態)
+// 3: 階段三 (點擊背景後 - 文字狀態)
+let currentStep = 0; 
+
+// 計時器
+let playTimer = null;
+let skipDisplayTimer = null;
+let skipOpacityTimer = null;
+
+// 月份名稱
+const MONTH_NAMES = [
+    "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+    "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+];
+
+if(debugInput) debugInput.value = startDate.toISOString().split('T')[0];
+
+
+// ==========================================
+//  輔助函式
+// ==========================================
+function safeGetVideoPath(epIndex, videoNum) {
+    if (typeof getVideoPath === 'function') return getVideoPath(epIndex, videoNum);
+    return "./assets/videos/transition-200.mp4"; 
+}
+
+function safeGetEasterEggPath(epIndex, imgNum) {
+    if (typeof getEasterEggPath === 'function') return getEasterEggPath(epIndex, imgNum);
+    return "./assets/images/1-1.jpg";
+}
+
+// ==========================================
+//  開發者模式
+// ==========================================
+if (producerInfo) {
+    producerInfo.style.cursor = "pointer"; 
+    producerInfo.addEventListener('click', function() {
+        devClickCount++;
+        if (devClickTimer) clearTimeout(devClickTimer);
+        devClickTimer = setTimeout(() => { devClickCount = 0; }, 1000);
+
+        if (devClickCount >= 5) {
+            toggleDevMode();
+            devClickCount = 0;
+        }
+    });
+}
+
+function toggleDevMode() {
+    isDevMode = !isDevMode; 
+    if (isDevMode) {
+        alert("🔧 開發者模式已開啟");
+        producerInfo.style.color = "#ff4444"; 
+        if(debugPanel) debugPanel.classList.add('active');
+    } else {
+        alert("🔒 開發者模式已關閉");
+        producerInfo.style.color = ""; 
+        if(debugPanel) debugPanel.classList.remove('active');
+    }
+    renderCalendar(); 
+}
+
+function setDebugDate() {
+    const newVal = debugInput.value;
+    if(!newVal) return;
+    startDate = new Date(newVal);
+    localStorage.setItem('loveCalendarStartDate', newVal);
+    alert(`起始日已更新為：${newVal}\n日曆將重新排列。`);
+    renderCalendar(); 
+}
+
+
+// ==========================================
+//  UI 縮放與渲染
+// ==========================================
+function scaleDetailView() {
+    const containerWidth = detailView.offsetWidth;
+    const containerHeight = detailView.offsetHeight;
+    const contentWidth = 1200; 
+    const contentHeight = 600; 
+    let scale = Math.min(containerWidth / contentWidth, containerHeight / contentHeight);
+    scale = Math.min(scale, 1);
+    detailScaler.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', scaleDetailView);
+
+function setMonthTitle(dateObj) {
+    const monthIndex = dateObj.getMonth();
+    const fullMonth = MONTH_NAMES[monthIndex];
+    const part1 = fullMonth.substring(0, 3);
+    const part2 = fullMonth.substring(3);
+    const monthContainer = document.querySelector('.month-text');
+    if(monthContainer) monthContainer.innerHTML = `<p class="month_red">${part1}</p><p>${part2}</p>`;
+}
+
+function renderCalendar() {
+    const startDayOfWeek = startDate.getDay(); 
+    const totalCellsNeeded = startDayOfWeek + 32;
+    if (totalCellsNeeded > 35) calendar.classList.add('rows-6');
+    else calendar.classList.remove('rows-6');
+
+    // 【修正】永遠使用起始日期的月份和年份
+    setMonthTitle(startDate);
+    
+    const yearEl = document.querySelector('.year-text');
+    if(yearEl) yearEl.innerText = startDate.getFullYear();
+
+    const allDayCells = Array.from(document.querySelectorAll('.container .days'));
+    allDayCells.forEach(el => {
+        el.style.display = 'none'; 
+        el.className = 'days';     
+        el.innerText = '';         
+        el.removeAttribute('data-idx');
+        el.onclick = null;         
+    });
+
+    let cellCursor = 0;
+    for (let i = 0; i < startDayOfWeek; i++) {
+        if (allDayCells[cellCursor]) {
+            allDayCells[cellCursor].style.display = 'flex';
+            allDayCells[cellCursor].classList.add('ndays');
+            cellCursor++;
+        }
+    }
+
+    for (let i = 0; i < 32; i++) {
+        if (allDayCells[cellCursor]) {
+            const cell = allDayCells[cellCursor];
+            cell.style.display = 'flex';
+            cell.classList.add('date-cell');
+            cell.setAttribute('data-idx', i);
+
+            let thisDate = new Date(startDate);
+            thisDate.setDate(startDate.getDate() + i);
+            let d = thisDate.getDate();
+            let dateText = d.toString().padStart(2, '0');
+            
+            if (d === 1) {
+                dateText = `${(thisDate.getMonth() + 1)} / 01`; 
+                cell.style.color = "#ffcc80"; 
+                cell.style.fontSize = "0.9em"; 
+            } else {
+                cell.style.fontSize = ""; cell.style.color = "";
+            }
+            cell.innerText = dateText;
+
+            // 真實日期判斷
+            const daysPassed = getDaysPassed();
+
+            if (isDevMode) {
+                if (i === unlockedIndex) cell.classList.add('active-day');
+                else cell.classList.add('read');
+            } else {
+                if (i < unlockedIndex) {
+                    // 以前看過的 -> 金色 (Read)
+                    cell.classList.add('read');
+                } else if (i === unlockedIndex && i <= daysPassed) {
+                    // 進度到了 且 時間也到了 -> 閃爍 (Active)
+                    cell.classList.add('active-day');
+                } else {
+                    // 進度沒到 或 時間還沒到 -> 鎖頭 (Locked)
+                    cell.classList.add('locked');
+                }
+            }
+
+            cell.onclick = () => handleClick(i);
+            cellCursor++;
+        }
+    }
+}
+
+
+// ==========================================
+//  核心互動邏輯
+// ==========================================
+
+function handleClick(index) {
+    const daysPassed = getDaysPassed();
+    
+    // 防止點擊未來日期
+    if (!isDevMode && (index > unlockedIndex || index > daysPassed)) {
+        // 只有點擊「明天」(下一格) 才跳提示
+        if (index === daysPassed + 1) {
+            alert("⏳ 還沒到這一天喔！請明天再來。");
+        }
+        return;
+    }
+
+    currentViewingIndex = index;
+    currentStep = 0; 
+    
+    const data = episodes[index];
+    let thisDate = new Date(startDate);
+    thisDate.setDate(startDate.getDate() + index);
+    document.getElementById('display-date').innerText = `${(thisDate.getMonth() + 1).toString().padStart(2, '0')} / ${thisDate.getDate().toString().padStart(2, '0')}`;
+    
+    detailTitle.innerText = data.title;   
+    detailQuote.innerHTML = data.quote;   
+    detailHint.innerText = data.nextHint; 
+
+    easterEggImg1.src = safeGetEasterEggPath(index, 1); 
+    easterEggImg2.src = safeGetEasterEggPath(index, 2); 
+    
+    // 重置互動區：確保打開時是圖片
+    if(interactionArea) {
+        interactionArea.classList.remove('show-hint');
+        interactionArea.classList.add('hidden-initially');
+        interactionArea.classList.remove('reveal-content');
+    }
+
+    [detailTitle, detailQuote].forEach(el => {
+        el.classList.add('hidden-initially');
+        el.classList.remove('reveal-content');
+    });
+
+    playTransition(safeGetVideoPath(index, 1));
+}
+
+function playTransition(videoUrl) {
+    const resetBtn = document.querySelector('.reset-btn');
+    if(resetBtn) resetBtn.style.display = 'none';
+
+    calendar.classList.add('minimized');
+    videoOverlay.classList.add('active');
+    detailView.classList.remove('active'); 
+    if(detailOverlay) detailOverlay.classList.remove('active');
+    
+    [playTimer, skipDisplayTimer, skipOpacityTimer].forEach(t => clearTimeout(t));
+    skipBtn.classList.remove('visible', 'low-opacity');
+
+    transitionVideo.src = videoUrl;
+    transitionVideo.style.display = 'block';
+    transitionVideo.play().catch(e => console.log("播放攔截", e));
+
+    skipDisplayTimer = setTimeout(() => {
+        skipBtn.classList.add('visible');
+        skipOpacityTimer = setTimeout(() => {
+            skipBtn.classList.add('low-opacity');
+        }, 5000); 
+    }, 5000);
+
+    transitionVideo.onended = finishTransition;
+}
+
+function skipVideo() { finishTransition(); }
+
+function finishTransition() {
+    [playTimer, skipDisplayTimer, skipOpacityTimer].forEach(t => clearTimeout(t));
+    transitionVideo.onended = null;
+    transitionVideo.pause();
+    transitionVideo.style.display = 'none';
+
+    videoOverlay.classList.remove('active');
+    const resetBtn = document.querySelector('.reset-btn');
+    if(resetBtn) resetBtn.style.display = 'block';
+
+    scaleDetailView();
+    detailView.classList.add('active');
+    if(detailOverlay) detailOverlay.classList.add('active');
+
+    // 狀態機推進
+    if (currentStep === 0) {
+        currentStep = 1;
+        detailTitle.classList.add('reveal-content');
+    } else {
+        currentStep = 2;
+        [detailTitle, detailQuote].forEach(el => el.classList.add('reveal-content'));
+        
+        if(interactionArea) {
+            interactionArea.classList.add('reveal-content');
+        }
+    }
+}
+
+
+// ==========================================
+//  事件監聽
+// ==========================================
+
+// 1. 詳細頁遮罩點擊 (控制退出流程)
+if (detailOverlay) {
+    detailOverlay.addEventListener('click', function() {
+        if (currentStep === 1) {
+            playTransition(safeGetVideoPath(currentViewingIndex, 2));
+        }
+        else if (currentStep === 2) {
+            triggerHintEffect();
+            currentStep = 3; 
+        }
+        else if (currentStep === 3) {
+            closeDetail();
+        }
+    });
+}
+
+// 2. 影片遮罩點擊 (修正：阻止冒泡但不執行 skipVideo)
+if (videoOverlay) {
+    videoOverlay.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+}
+
+if (skipBtn) {
+    skipBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+}
+
+// 3. 觸發特效函式
+function triggerHintEffect() {
+    if(interactionArea) {
+        interactionArea.classList.add('show-hint');
+    }
+}
+
+// 4. 彩蛋按鈕監聽
+if(easterEggBtn1) {
+    easterEggBtn1.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playTransition(safeGetVideoPath(currentViewingIndex, 3));
+    });
+}
+
+if(easterEggBtn2) {
+    easterEggBtn2.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playTransition(safeGetVideoPath(currentViewingIndex, 4));
+    });
+}
+
+function closeDetail() {
+    detailView.classList.remove('active');
+    if(detailOverlay) detailOverlay.classList.remove('active');
+    calendar.classList.remove('minimized');
+    
+    // 關閉時重置特效，確保下次打開是圖片
+    if(interactionArea) {
+        interactionArea.classList.remove('reveal-content');
+        interactionArea.classList.remove('show-hint');
+        interactionArea.classList.add('hidden-initially');
+    }
+
+    if (currentViewingIndex === unlockedIndex) {
+        unlockedIndex++;
+        localStorage.setItem('loveCalendarProgress', unlockedIndex);
+    }
+    renderCalendar();
+}
+
+// 【修正】重置功能 - 提供兩種選擇
+function resetProgress() {
+    // 建立自定義對話框
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100vw';
+    modal.style.height = '100vh';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    modal.style.display = 'flex';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.backgroundColor = '#2b2222';
+    modalContent.style.padding = '30px';
+    modalContent.style.borderRadius = '10px';
+    modalContent.style.border = '2px solid #d4af37';
+    modalContent.style.maxWidth = '400px';
+    modalContent.style.textAlign = 'center';
+    
+    modalContent.innerHTML = `
+        <h3 style="color: #d4af37; margin-bottom: 20px;">重置選項</h3>
+        <p style="color: #f0f0f0; margin-bottom: 25px;">請選擇重置方式：</p>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button id="resetProgressOnly" style="
+                background: rgba(212, 175, 55, 0.2);
+                color: #d4af37;
+                border: 1px solid #d4af37;
+                padding: 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.3s;
+            ">只重置進度<br><small>保留起始日期，僅重設解鎖狀態</small></button>
+            
+            <button id="resetFull" style="
+                background: rgba(255, 100, 100, 0.2);
+                color: #ff6b6b;
+                border: 1px solid #ff6b6b;
+                padding: 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.3s;
+            ">完全重置<br><small>清除所有資料，重新設定起始日期為今天</small></button>
+            
+            <button id="cancelReset" style="
+                background: rgba(100, 100, 100, 0.2);
+                color: #aaa;
+                border: 1px solid #666;
+                padding: 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.3s;
+                margin-top: 10px;
+            ">取消</button>
+        </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // 按鈕事件監聽
+    document.getElementById('resetProgressOnly').addEventListener('click', function() {
+        // 只重置進度
+        localStorage.removeItem('loveCalendarProgress');
+        document.body.removeChild(modal);
+        alert('✅ 進度已重置！起始日期保持不變。');
+        location.reload();
+    });
+    
+    document.getElementById('resetFull').addEventListener('click', function() {
+        // 完全重置（清除所有資料）
+        localStorage.clear();
+        document.body.removeChild(modal);
+        alert('✅ 已完全重置！起始日期將設定為今天。');
+        location.reload();
+    });
+    
+    document.getElementById('cancelReset').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+    
+    // 點擊背景也可以取消
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
+
+renderCalendar();
+scaleDetailView();
+
+// 水波紋特效
+document.addEventListener('click', function(e) {
+    if (videoOverlay.classList.contains('active')) return;
+    const ripple = document.createElement('div');
+    ripple.classList.add('click-ripple');
+    ripple.style.left = e.clientX + 'px';
+    ripple.style.top = e.clientY + 'px';
+    document.body.appendChild(ripple);
+    setTimeout(() => { if(ripple.parentNode) ripple.remove(); }, 18000); 
+});
