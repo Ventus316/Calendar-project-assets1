@@ -518,13 +518,29 @@ function resetProgress() {
 renderCalendar();
 scaleDetailView();
 
-// 水波紋特效
-document.addEventListener('click', function(e) {
-    if (videoOverlay.classList.contains('active')) return;
+// ==========================================
+//  水波紋特效 (純淨穩定版 - 不需伺服器)
+// ==========================================
+document.addEventListener('mousedown', function(e) {
+    const videoOverlay = document.getElementById('video-overlay');
+    const detailView = document.getElementById('detail-view');
+    
+    // 如果正在看影片或卡片，就不產生水波
+    if (videoOverlay && videoOverlay.classList.contains('active')) return;
+    if (detailView && detailView.classList.contains('active')) return;
+
+    // 建立水波紋元素
     const ripple = document.createElement('div');
-    ripple.classList.add('click-ripple');
+    ripple.className = 'click-ripple';
     ripple.style.left = e.clientX + 'px';
     ripple.style.top = e.clientY + 'px';
+    
     document.body.appendChild(ripple);
-    setTimeout(() => { if(ripple.parentNode) ripple.remove(); }, 18000); 
+
+    // 【防卡頓關鍵】：2.5 秒動畫播完後，立刻從網頁中徹底刪除！
+    setTimeout(() => {
+        if (ripple && ripple.parentNode) {
+            ripple.parentNode.removeChild(ripple);
+        }
+    }, 2500);
 });
